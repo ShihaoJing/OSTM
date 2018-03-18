@@ -6,9 +6,10 @@
 
 #define ENABLE_THREADS
 #define ERR_CHK
+#define ENABLE_STATISTICS
 
-//#define MAIN_BLACKSCHOLES		main
-#define MAIN_SWAPTIONS		main
+#define MAIN_BLACKSCHOLES		main
+//#define MAIN_SWAPTIONS		main
 //#define MAIN_FLUIDANIMATE 	main
 //#define MAIN_FLUIDANIMATE_SERIAL	main
 //#define MAIN_FULIDCMP			main

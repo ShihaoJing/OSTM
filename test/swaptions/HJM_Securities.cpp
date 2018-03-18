@@ -98,15 +98,23 @@ void worker(void *arg){
                                        swaption_seed+i, NUM_TRIALS, BLOCK_SIZE, 0);
      assert(iSuccess == 1);
 
+#ifdef ENABLE_THREADS
+
      void **args = (void**)malloc(sizeof(void*) * 3);
      args[0] = (void*)i;
      args[1] = (void*)(&pdSwaptionPrice[0]);
      args[2] = (void*)(&pdSwaptionPrice[1]);
 
      O_API::run_in_order(transactional_work, args, i);
+#else
+     swaptions[i].dSimSwaptionMeanPrice = pdSwaptionPrice[0];
+     swaptions[i].dSimSwaptionStdError = pdSwaptionPrice[1];
+#endif
    }
 
+#ifdef ENABLE_THREADS
   O_API::wait_till_finish();
+#endif
 }
 
 
@@ -251,10 +259,10 @@ int MAIN_SWAPTIONS(int argc, char *argv[])
 	}
 
 
+	long long startTime = getElapsedTime();
 	// **********Calling the Swaption Pricing Routine*****************
 #ifdef ENABLE_THREADS
 	
-	long long startTime = getElapsedTime();
 
 	thread_start(worker, NULL);
 
@@ -262,11 +270,10 @@ int MAIN_SWAPTIONS(int argc, char *argv[])
 
 	thread_shutdown();
 
-
-
 #else
 	int threadID=0;
 	worker(&threadID);
+	long long endTime = getElapsedTime();
 #endif //ENABLE_THREADS
 
 	/*for (int i = 0; i < nSwaptions; i++) {
@@ -286,12 +293,15 @@ int MAIN_SWAPTIONS(int argc, char *argv[])
 
 	cout << "===================================" << endl;
 	cout << "Time =  \t" << endTime - startTime << endl;
-	O_API::print_statistics();
-	//cout << "Workers = \t" << nThreads << endl;
+	cout << "Workers = \t" << nThreads << endl;
 	//cout << "Cleaners = \t" << cleaners << endl;
 	//cout << "Transactions =\t" << workload << endl;
 	//cout << "Aborts =\t" << executed - workload << endl;
 	cout << "===================================" << endl;
+
+#ifdef ENABLE_THREADS
+	O_API::print_statistics();
+#endif
 	cout << "!!!Bye!!!" << endl;
 
 	//***********************************************************

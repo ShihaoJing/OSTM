@@ -2,6 +2,7 @@
 #define O_API_HPP_
 
 #include <setjmp.h>
+#include <atomic>
 
 #include <iostream>
 using namespace std;
@@ -29,12 +30,18 @@ static pthread_barrier_t   finish_barrier;
 static pthread_mutex_t lock;
 static pthread_key_t history_key;
 
+#ifdef ENABLE_STATISTICS
+static atomic_int transactions_count(0);
+static atomic_int executions_count(0);
+#else
 static int transactions_count = 0;
 static int executions_count = 0;
+#endif
 static int workers_count = -1;
 
-static int cores_counter = 0;
+#
 
+static int cores_counter = 0;
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Dummy ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 

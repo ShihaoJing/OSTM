@@ -222,9 +222,11 @@ void bs_thread(void *arg) {
  	int tid = thread_getId();
 	LOG("Thread " << tid);
 	int workers_count = O_API::get_workers_count();
-	int i;
+	if (workers_count < 0)
+		workers_count = 1;
+	fptype **prices = (float**)arg;
 
-	for (i = tid; i < numOptions; i += workers_count) {
+	for (int i = tid; i < numOptions; i += workers_count) {
 		fptype price = BlkSchlsEqEuroNoDiv(
 				sptprice[i],
 				strike[i],
@@ -233,16 +235,23 @@ void bs_thread(void *arg) {
 				otime[i],
 				otype[i],
 				0);
+
+#ifdef ENABLE_THREADS
 		void **args = (void**)malloc(sizeof(void*) * 3);
 		args[0] = (void*)i;
 		args[1] = (void*)(&price);
-		args[2] = arg;
+		args[2] = (void*)arg;
 
 		
 		O_API::run_in_order(transactional_work, args, i);
+#else
+		*prices[i] = price;
+#endif
 	}
 
+#ifdef ENABLE_THREADS
 	O_API::wait_till_finish();
+#endif
 }
 
 int MAIN_BLACKSCHOLES(int argc, char **argv)
@@ -305,8 +314,25 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 		exit(1);
 	}
 
+#ifdef ENABLE_THREADS
+
+
+	if ((nThreads < 1) || (nThreads > MAX_THREADS))
+	{
+		fprintf(stderr,"Number of threads must be between 1 and %d.\n", MAX_THREADS);
+		exit(1);
+	}
+
 	O_API::init(nThreads);
 	thread_startup(nThreads);
+
+#else
+	if (nThreads != 1)
+	{
+		fprintf(stderr,"Number of threads must be 1 (serial version)\n");
+		exit(1);
+	}
+#endif //ENABLE_THREADS
 
 	printf("Num of Options: %d\n", numOptions);
 	printf("Num of Runs: %d\n", NUM_RUNS);
@@ -337,14 +363,20 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 
 	long long startTime = getElapsedTime();
 
+#ifdef ENABLE_THREADS
+
 	for (int i = 0; i < NUM_RUNS; ++i) {
 		thread_start(bs_thread, prices);
 	}
 
 	long long endTime = getElapsedTime();
-
 	thread_shutdown();
 
+#else
+	int threadID=0;
+	bs_thread(prices);
+	long long endTime = getElapsedTime();
+#endif
 
 	cout << "===================================" << endl;
 
@@ -368,6 +400,9 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 	//cout << "Transactions =\t" << workload << endl;
 	//cout << "Aborts =\t" << executed - workload << endl;
 	cout << "===================================" << endl;
+#ifdef ENABLE_THREADS
+	O_API::print_statistics();
+#endif
 	cout << "!!!Bye!!!" << endl;
 
 	//Write prices to output file
