@@ -25,6 +25,7 @@ CPP_DEPS :=
 SUBDIRS := \
 algs \
 o-api \
+test/SimpleHashMap \
 test/blackscholes \
 test/fluidanimate \
 test/swaptions \

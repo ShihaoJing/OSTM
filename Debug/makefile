@@ -11,6 +11,7 @@ RM := rm -rf
 -include test/swaptions/subdir.mk
 -include test/fluidanimate/subdir.mk
 -include test/blackscholes/subdir.mk
+-include test/SimpleHashMap/subdir.mk
 -include test/subdir.mk
 -include o-api/subdir.mk
 -include algs/subdir.mk
