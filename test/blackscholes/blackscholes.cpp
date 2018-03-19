@@ -267,14 +267,13 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 
     fptype **prices;
 
-    if (argc != 4)
+    if (argc != 3)
 	{
-		printf("Usage:\n\t%s <nthreads> <inputFile> <outputFile>\n", argv[0]);
+		printf("Usage:\n\t%s <nthreads> <inputFile>\n", argv[0]);
 		exit(1);
 	}
 	nThreads = atoi(argv[1]);
 	char *inputFile = argv[2];
-	char *outputFile = argv[3];
 
 	//Read input data from file
 	file = fopen(inputFile, "r");
@@ -405,34 +404,6 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 #endif
 	cout << "!!!Bye!!!" << endl;
 
-	//Write prices to output file
-	file = fopen(outputFile, "w");
-	if(file == NULL) {
-	  printf("ERROR: Unable to open file %s.\n", outputFile);
-	  exit(1);
-	}
-	rv = fprintf(file, "%i\n", numOptions);
-	if(rv < 0) {
-	  printf("ERROR: Unable to write to file %s.\n", outputFile);
-	  fclose(file);
-	  exit(1);
-	}
-
-	LOG("start writing results to file");
-	for(int i=0; i<numOptions; i++) {
-	  LOG("index " << i << " value " << *prices[i]);
-	  rv = fprintf(file, "%.18f\n", *prices[i]);
-	  if(rv < 0) {
-		printf("ERROR: Unable to write to file %s.\n", outputFile);
-		fclose(file);
-		exit(1);
-	  }
-	}
-	rv = fclose(file);
-	if(rv != 0) {
-	  printf("ERROR: Unable to close file %s.\n", outputFile);
-	  exit(1);
-	}
 
 
 
