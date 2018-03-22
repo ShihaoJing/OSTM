@@ -276,11 +276,11 @@ int MAIN_SWAPTIONS(int argc, char *argv[])
 	long long endTime = getElapsedTime();
 #endif //ENABLE_THREADS
 
-	/*for (int i = 0; i < nSwaptions; i++) {
+	for (int i = 0; i < nSwaptions; i++) {
 	  fprintf(stderr,"Swaption %d: [SwaptionPrice: %.10lf StdError: %.10lf] \n",
 			   i, swaptions[i].dSimSwaptionMeanPrice, swaptions[i].dSimSwaptionStdError);
 
-	}*/
+	}
 
 	for (int i = 0; i < nSwaptions; i++) {
 	  free_dvector(swaptions[i].pdYield, 0, swaptions[i].iN-1); // @suppress("Invalid arguments")

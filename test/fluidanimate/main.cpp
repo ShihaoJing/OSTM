@@ -47,7 +47,8 @@
 //#define pthreads
 #define pthreads3
 
-std::atomic_int global_age;
+atomic_int global_age;
+
 
 #define STAGE_0 0
 #define STAGE_1 1
@@ -547,6 +548,8 @@ void ClearParticlesMT(int tid) {
 	INFO("Start TX:" << age);
 	O_API::run_in_order(ClearParticlesMT_T, NULL, age);*/
 
+	INFO("ClearParticlesMT");
+
 	for (int iz = grids[tid].sz; iz < grids[tid].ez; ++iz)
 			for (int iy = grids[tid].sy; iy < grids[tid].ey; ++iy)
 				for (int ix = grids[tid].sx; ix < grids[tid].ex; ++ix) {
@@ -578,17 +581,21 @@ void RebuildGridMT_T(void **args) {
 	}
 
 
+	tx->write_i((int*)&cnumPars[index], tx->read_i((int*)&cnumPars[index]) + 1);
 	OTM_END();
 }
 
 void RebuildGridMT(int tid) {
-	DEBUG("RebuildGridMT");
+	INFO("RebuildGridMT");
 	// Note, in parallel versions the below swaps
 	// occure outside RebuildGrid()
 	// swap src and dest arrays with particles
 	//   std::swap(cells, cells2);
 	// swap src and dest arrays with counts of particles
 	//  std::swap(cnumPars, cnumPars2);
+
+	int workers = O_API::get_workers_count();
+	int age = tid;
 
 	//iterate through source cell lists
 	for (int iz = grids[tid].sz; iz < grids[tid].ez; ++iz)
@@ -685,10 +692,11 @@ void RebuildGridMT(int tid) {
 						args[0] = (void*)&cell;
 						args[1] = (void*)&np;
 						args[2] = (void*)&index;
-						O_API::run_in_order(RebuildGridMT_T, args, global_age++);
+						O_API::run_in_order(RebuildGridMT_T, args, ++global_age);
+						//age += workers;
 
 						//OTM_SHARED_WRITE_I(cnumPars[index], OTM_SHARED_READ_I(cnumPars[index]) + 1);
-						++cnumPars[index];
+						//++cnumPars[index];
 					}
 					else {
 						cell = last_cells[index];
@@ -763,6 +771,7 @@ int InitNeighCellList(int ci, int cj, int ck, int *neighCells) {
 
 ////////////////////////////////////////////////////////////////////////////////
 void InitDensitiesAndForcesMT(int tid) {
+	INFO("InitDensitiesAndForcesMT");
 	/*int workers = O_API::get_workers_count();
 	int age = STAGE_2 * workers + tid;
 	INFO("Start TX:" << age);
@@ -796,8 +805,11 @@ void ComputeDensitiesMT_T(void **args) {
 }
 
 void ComputeDensitiesMT(int tid) {
-	DEBUG("ComputeDensitiesMT");
+	INFO("ComputeDensitiesMT");
 	int neighCells[3 * 3 * 3];
+
+	int workers = O_API::get_workers_count();
+	int age = tid;
 
 	for (int iz = grids[tid].sz; iz < grids[tid].ez; ++iz)
 		for (int iy = grids[tid].sy; iy < grids[tid].ey; ++iy)
@@ -854,7 +866,8 @@ void ComputeDensitiesMT(int tid) {
 										args[0] = (void*)cell;
 										args[1] = (void*)&index;
 										args[2] = (void*)&tc;
-										O_API::run_in_order(ComputeDensitiesMT_T, args, global_age++);
+										O_API::run_in_order(ComputeDensitiesMT_T, args, ++global_age);
+										age += workers;
 										/*OTM_SHARED_WRITE_P(
 												cell->density[ipar % PARTICLES_PER_CELL],
 												OTM_SHARED_READ_P(cell->density[ipar % PARTICLES_PER_CELL]) + tc);*/
@@ -868,7 +881,8 @@ void ComputeDensitiesMT(int tid) {
 										args[0] = (void*)neigh;
 										args[1] = (void*)&index;
 										args[2] = (void*)&tc;
-										O_API::run_in_order(ComputeDensitiesMT_T, args, global_age++);
+										O_API::run_in_order(ComputeDensitiesMT_T, args, ++global_age);
+										age += workers;
 										/*OTM_SHARED_WRITE_P(
 												neigh->density[iparNeigh% PARTICLES_PER_CELL],
 												OTM_SHARED_READ_P(neigh->density[iparNeigh% PARTICLES_PER_CELL]) + tc);*/
@@ -896,6 +910,7 @@ void ComputeDensitiesMT(int tid) {
 
 ////////////////////////////////////////////////////////////////////////////////
 void ComputeDensities2MT(int tid) {
+	INFO("ComputeDensities2MT");
 	const fptype tc = hSq * hSq * hSq;
 	for (int iz = grids[tid].sz; iz < grids[tid].ez; ++iz)
 		for (int iy = grids[tid].sy; iy < grids[tid].ey; ++iy)
@@ -923,21 +938,21 @@ void ComputeForcesMT_T(void **args) {
     int index = *((int*)args[1]);
     Vec3 acc = *((Vec3*)args[2]);
     bool isNeigh = *((bool*)args[3]);
-    if (isNeigh) {
-    	OTM_SHARED_WRITE_F(cell->a[index].x,
-    				OTM_SHARED_READ_F(cell->a[index].x) + acc.x);
-		OTM_SHARED_WRITE_F(cell->a[index].y,
-				OTM_SHARED_READ_F(cell->a[index].y) + acc.y);
-		OTM_SHARED_WRITE_F(cell->a[index].z,
-				OTM_SHARED_READ_F(cell->a[index].z) + acc.z);
+    if (!isNeigh) {
+    	OTM_SHARED_WRITE_F((cell->a[index].x),
+    				OTM_SHARED_READ_F((cell->a[index].x)) + acc.x);
+		OTM_SHARED_WRITE_F((cell->a[index].y),
+				OTM_SHARED_READ_F((cell->a[index].y)) + acc.y);
+		OTM_SHARED_WRITE_F((cell->a[index].z),
+				OTM_SHARED_READ_F((cell->a[index].z)) + acc.z);
     }
     else {
-    	OTM_SHARED_WRITE_F(cell->a[index].x,
-    	    				OTM_SHARED_READ_F(cell->a[index].x) - acc.x);
-		OTM_SHARED_WRITE_F(cell->a[index].y,
-				OTM_SHARED_READ_F(cell->a[index].y) - acc.y);
-		OTM_SHARED_WRITE_F(cell->a[index].z,
-				OTM_SHARED_READ_F(cell->a[index].z) - acc.z);
+    	OTM_SHARED_WRITE_F((cell->a[index].x),
+    	    				OTM_SHARED_READ_F((cell->a[index].x)) - acc.x);
+		OTM_SHARED_WRITE_F((cell->a[index].y),
+				OTM_SHARED_READ_F((cell->a[index].y)) - acc.y);
+		OTM_SHARED_WRITE_F((cell->a[index].z),
+				OTM_SHARED_READ_F((cell->a[index].z)) - acc.z);
     }
 
 
@@ -946,8 +961,11 @@ void ComputeForcesMT_T(void **args) {
 
 void ComputeForcesMT(int tid) {
 
-	DEBUG("ComputeForcesMT");
+	INFO("ComputeForcesMT");
 	int neighCells[3 * 3 * 3];
+
+	int workers = O_API::get_workers_count();
+	int age = tid;
 
 	for (int iz = grids[tid].sz; iz < grids[tid].ez; ++iz)
 		for (int iy = grids[tid].sy; iy < grids[tid].ey; ++iy)
@@ -1030,7 +1048,8 @@ void ComputeForcesMT(int tid) {
 										args[1] = (void*)&index;
 										args[2] = (void*)&acc;
 										args[3] = (void*)&isNeigh;
-										O_API::run_in_order(ComputeForcesMT_T, args, global_age++);
+										O_API::run_in_order(ComputeForcesMT_T, args, ++global_age);
+										age += workers;
 									} else
 										cell->a[ipar % PARTICLES_PER_CELL] +=
 												acc;
@@ -1043,7 +1062,8 @@ void ComputeForcesMT(int tid) {
 										args[1] = (void*)&index;
 										args[2] = (void*)&acc;
 										args[3] = (void*)&isNeigh;
-										O_API::run_in_order(ComputeForcesMT_T, args, global_age++);
+										O_API::run_in_order(ComputeForcesMT_T, args, age);
+										age += workers;
 
 									} else
 										neigh->a[iparNeigh % PARTICLES_PER_CELL] -=
@@ -1122,7 +1142,7 @@ void ProcessCollisionsMT(int tid)
 }
 #else
 void ProcessCollisionsMT(int tid) {
-	DEBUG("ProcessCollisionsMT");
+	INFO("ProcessCollisionsMT");
 	/*int workers = O_API::get_workers_count();
 	int age = STAGE_6 * workers + tid;
 	INFO("Start TX:" << age);
@@ -1269,10 +1289,8 @@ void ProcessCollisions2MT(int tid) {
 
 ////////////////////////////////////////////////////////////////////////////////
 void AdvanceParticlesMT(int tid) {
-	/*int workers = O_API::get_workers_count();
-	int age = STAGE_7 * workers + tid;
-	INFO("Start TX:" << age);
-	O_API::run_in_order(AdvanceParticlesMT_T, NULL, age);*/
+	INFO("AdvanceParticlesMT");
+
 	for (int iz = grids[tid].sz; iz < grids[tid].ez; ++iz)
 		for (int iy = grids[tid].sy; iy < grids[tid].ey; ++iy)
 			for (int ix = grids[tid].sx; ix < grids[tid].ex; ++ix) {
@@ -1316,20 +1334,31 @@ void AdvanceFrameMT(int tid) {
 
 	ClearParticlesMT(tid);
 	pthread_barrier_wait(&barrier);
+
 	RebuildGridMT(tid);
+	//O_API::wait_till_finish();
 	pthread_barrier_wait(&barrier);
+
 	InitDensitiesAndForcesMT(tid);
 	pthread_barrier_wait(&barrier);
+
 	ComputeDensitiesMT(tid);
 	pthread_barrier_wait(&barrier);
+	//O_API::wait_till_finish();
+
 	ComputeDensities2MT(tid);
 	pthread_barrier_wait(&barrier);
+
 	ComputeForcesMT(tid);
 	pthread_barrier_wait(&barrier);
+	//O_API::wait_till_finish();
+
 	ProcessCollisionsMT(tid);
 	pthread_barrier_wait(&barrier);
+
 	AdvanceParticlesMT(tid);
 	pthread_barrier_wait(&barrier);
+
 #if defined(USE_ImpeneratableWall)
 	// N.B. The integration of the position can place the particle
 	// outside the domain. We now make a pass on the perimiter cells
@@ -1386,7 +1415,8 @@ void AdvanceFrameVisualization()
 ////////////////////////////////////////////////////////////////////////////////
 
 int MAIN_FLUIDANIMATE(int argc, char *argv[]) {
-	global_age = 0;
+
+	global_age = -1;
 
 	if (argc < 4 || argc >= 6) {
 		std::cout << "Usage: " << argv[0]
@@ -1417,6 +1447,8 @@ int MAIN_FLUIDANIMATE(int argc, char *argv[]) {
 	InitVisualizationMode(&argc, argv, &AdvanceFrameVisualization, &numCells, &cells, &cnumPars);
 #endif
 
+	INFO("Init threads");
+
 	O_API::init(threadnum);
 	thread_startup(threadnum);
 
@@ -1437,14 +1469,6 @@ int MAIN_FLUIDANIMATE(int argc, char *argv[]) {
 	cout << "===================================" << endl;
 	cout << "!!!Bye!!!" << endl;
 
-	// *** PARALLEL PHASE *** //
-#ifdef ENABLE_VISUALIZATION
-	Visualize();
-#endif
-
-	if (argc > 4)
-		SaveFile(argv[4]);
-	CleanUpSim();
 
 	return 0;
 }

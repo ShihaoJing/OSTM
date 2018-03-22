@@ -9,9 +9,9 @@
 #define ENABLE_STATISTICS
 
 //#define MAIN_HASHMAP main
-#define MAIN_BLACKSCHOLES		main
+//#define MAIN_BLACKSCHOLES		main
 //#define MAIN_SWAPTIONS		main
-//#define MAIN_FLUIDANIMATE 	main
+#define MAIN_FLUIDANIMATE 	main
 //#define MAIN_FLUIDANIMATE_SERIAL	main
 //#define MAIN_FULIDCMP			main
 //#define MAIN_MICROBENCH		main
@@ -61,9 +61,9 @@
 
 
 
-#define O_API	o_api_oul_steal
+//#define O_API	o_api_oul_steal
 //#define O_API	o_api_oul_steal_plus
-//#define O_API	o_api_oul_steal_plus_plus
+#define O_API	o_api_oul_steal_plus_plus
 #define TRANSACTION oul_steal::Transaction
 
 #define STM_BITS_32

@@ -31,10 +31,18 @@ static atomic_int global_age;
 int* num;
 int* nums[4];
 
+static int o = 0;
+static long n = 100;
+static long m = 10000;
+static long* elements;
+
+
 static void transactional_work(void **args) {
 	int index = *((int*)args[0]);
 	OTM_BEGIN();
-	OTM_SHARED_WRITE_I(*(nums[index]), index);
+	//OTM_SHARED_WRITE_I(*(nums[index]), index);
+	tx->write_i((int*)&num[index], index);
+	//OTM_SHARED_WRITE_I((int*)&num[index], index);
 	OTM_END();
 }
 
@@ -57,8 +65,8 @@ static void worker(void *args) {
 	 for (int i = 0; i < 4; ++i) {
 		 nums[i] = new int;
 	 }
-	 num = new int;
-	 int threadNum = 2;
+	 num = new int[4];
+	 int threadNum = 4;
 	 O_API::init(threadNum);
 	 thread_startup(threadNum);
 
@@ -67,7 +75,7 @@ static void worker(void *args) {
 
 	 cout << "===========================" << endl;
 	 for (int i = 0; i < 4; ++i) {
-		 cout << *nums[i] << endl;
+		 cout << num[i] << endl;
 	 }
 	 //cout << *num << endl;
 	 return 0;
