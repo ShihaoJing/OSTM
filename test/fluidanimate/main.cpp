@@ -1461,7 +1461,7 @@ int MAIN_FLUIDANIMATE(int argc, char *argv[]) {
 	thread_shutdown();
 
 	cout << "===================================" << endl;
-	cout << "Time =  \t" << endTime - startTime << endl;
+	cout << "Time =  \t" << (endTime - startTime) / 10000000 << endl;
 	cout << "Workers = \t" << threadnum << endl;
 	//cout << "Cleaners = \t" << cleaners << endl;
 	//cout << "Transactions =\t" << workload << endl;

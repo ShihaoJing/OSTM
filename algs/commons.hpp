@@ -24,7 +24,8 @@
 //#define LOGGING
 //#define DEFFERED
 
-#define INFO(X) 				{ std::stringstream ss; ss << pthread_self() << ":" << X << std::endl; std::cout << ss.str(); }
+#define INFO(X)
+//#define INFO(X) 				{ std::stringstream ss; ss << pthread_self() << ":" << X << std::endl; std::cout << ss.str(); }
 
 #ifdef LOGGING
 #ifdef DEFFERED
