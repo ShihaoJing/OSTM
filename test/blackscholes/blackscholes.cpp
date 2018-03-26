@@ -71,6 +71,8 @@ fptype * otime;
 int numError = 0;
 static int nThreads;
 
+fptype *prices;
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -212,9 +214,9 @@ fptype BlkSchlsEqEuroNoDiv( fptype sptprice,
 static void transactional_work(void **args) {
 	int index = (long)args[0];
 	fptype price = *(fptype*)args[1];
-	fptype **prices = (float**)args[2];
 	OTM_BEGIN();
-	OTM_SHARED_WRITE_F(*prices[index], price);
+	tx->write_f((fptype*)&prices[index], price);
+	//OTM_SHARED_WRITE_F((fptype*)&prices[index], price);
 	OTM_END();
 }
 
@@ -224,7 +226,6 @@ void bs_thread(void *arg) {
 	int workers_count = O_API::get_workers_count();
 	if (workers_count < 0)
 		workers_count = 1;
-	fptype **prices = (float**)arg;
 
 	for (int i = tid; i < numOptions; i += workers_count) {
 		fptype price = BlkSchlsEqEuroNoDiv(
@@ -240,12 +241,11 @@ void bs_thread(void *arg) {
 		void **args = (void**)malloc(sizeof(void*) * 3);
 		args[0] = (void*)i;
 		args[1] = (void*)(&price);
-		args[2] = (void*)arg;
 
 		
 		O_API::run_in_order(transactional_work, args, i);
 #else
-		*prices[i] = price;
+		prices[i] = price;
 #endif
 	}
 
@@ -265,7 +265,7 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
     int rv;
 
 
-    fptype **prices;
+
 
     if (argc != 3)
 	{
@@ -294,10 +294,7 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 
 	// alloc spaces for the option data
 	data = (OptionData*)malloc(numOptions*sizeof(OptionData));
-	prices = (fptype**)malloc(numOptions*sizeof(fptype*));
-	for (int i = 0; i < numOptions; ++i) {
-		prices[i] = (fptype*)malloc(sizeof(fptype));;
-	}
+	prices = (fptype*)malloc(numOptions*sizeof(fptype));
 	for (int loopnum = 0; loopnum < numOptions; ++ loopnum )
 	{
 		rv = fscanf(file, "%f %f %f %f %f %f %c %f %f", &data[loopnum].s, &data[loopnum].strike, &data[loopnum].r, &data[loopnum].divq, &data[loopnum].v, &data[loopnum].t, &data[loopnum].OptionType, &data[loopnum].divs, &data[loopnum].DGrefval);
@@ -364,9 +361,8 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 
 #ifdef ENABLE_THREADS
 
-	for (int i = 0; i < NUM_RUNS; ++i) {
-		thread_start(bs_thread, prices);
-	}
+	thread_start(bs_thread, prices);
+
 
 	long long endTime = getElapsedTime();
 	thread_shutdown();
@@ -381,7 +377,7 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 
 #ifdef ERR_CHK
 	for (int i = 0; i < numOptions; i++) {
-		fptype priceDelta = data[i].DGrefval - *prices[i];
+		fptype priceDelta = data[i].DGrefval - prices[i];
 		if( fabs(priceDelta) >= 1e-4 ){
 			printf("Error on %d. Computed=%.5f, Ref=%.5f, Delta=%.5f\n",
 				   i, prices[i], data[i].DGrefval, priceDelta);
@@ -404,11 +400,6 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 #endif
 	cout << "!!!Bye!!!" << endl;
 
-
-
-
-	free(data);
-	free(prices);
 	return 0;
 }
 

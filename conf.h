@@ -5,13 +5,13 @@
 //#define BENCH			mcas_bench
 
 #define ENABLE_THREADS
-#define ERR_CHK
+//#define ERR_CHK
 #define ENABLE_STATISTICS
 
 //#define MAIN_HASHMAP main
-//#define MAIN_BLACKSCHOLES		main
+#define MAIN_BLACKSCHOLES		main
 //#define MAIN_SWAPTIONS		main
-#define MAIN_FLUIDANIMATE 	main
+//#define MAIN_FLUIDANIMATE 	main
 //#define MAIN_FLUIDANIMATE_SERIAL	main
 //#define MAIN_FULIDCMP			main
 //#define MAIN_MICROBENCH		main
@@ -33,11 +33,11 @@
 //#define O_API	o_api_norec
 //#define O_API	o_api_undolog_invis
 
-//#define O_API	o_api_otl2
+#define O_API	o_api_otl2
 //#define O_API	o_api_onorec
 //#define O_API	o_api_undolog_invis_ordered
 //#define O_API	o_api_stmlite
-//#define TRANSACTION commons::AbstractTransaction
+#define TRANSACTION commons::AbstractTransaction
 
 
 
@@ -63,8 +63,8 @@
 
 //#define O_API	o_api_oul_steal
 //#define O_API	o_api_oul_steal_plus
-#define O_API	o_api_oul_steal_plus_plus
-#define TRANSACTION oul_steal::Transaction
+//#define O_API	o_api_oul_steal_plus_plus
+//#define TRANSACTION oul_steal::Transaction
 
 #define STM_BITS_32
 //#define STM_BITS_64
