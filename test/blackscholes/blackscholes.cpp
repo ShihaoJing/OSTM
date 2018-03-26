@@ -227,7 +227,11 @@ void bs_thread(void *arg) {
 	if (workers_count < 0)
 		workers_count = 1;
 
+	long long startTime = getElapsedTime();
+
+
 	for (int i = tid; i < numOptions; i += workers_count) {
+	//for (int i = start; i < end; ++i) {
 		fptype price = BlkSchlsEqEuroNoDiv(
 				sptprice[i],
 				strike[i],
@@ -238,16 +242,20 @@ void bs_thread(void *arg) {
 				0);
 
 #ifdef ENABLE_THREADS
-		void **args = (void**)malloc(sizeof(void*) * 3);
+		void **args = (void**)malloc(sizeof(void*) * 2);
 		args[0] = (void*)i;
 		args[1] = (void*)(&price);
 
-		
+
 		O_API::run_in_order(transactional_work, args, i);
 #else
 		prices[i] = price;
 #endif
 	}
+
+	long long endTime = getElapsedTime();
+
+	INFO("Thread " << tid << " time " << (endTime - startTime) / 9);
 
 #ifdef ENABLE_THREADS
 	O_API::wait_till_finish();
