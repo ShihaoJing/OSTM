@@ -57,7 +57,7 @@ int chunksize;
 
 
 static void transactional_work(void **args) {
-	int index = (long)args[0];
+	int index = *(int*)args[0];
 	FTYPE price0 = *(FTYPE*)args[1];
 	FTYPE price1 = *(FTYPE*)args[2];
 	LOG("price " << price0 << " " << price1);
@@ -101,7 +101,7 @@ void worker(void *arg){
 #ifdef ENABLE_THREADS
 
      void **args = (void**)malloc(sizeof(void*) * 3);
-     args[0] = (void*)i;
+     args[0] = (void*)&i;
      args[1] = (void*)(&pdSwaptionPrice[0]);
      args[2] = (void*)(&pdSwaptionPrice[1]);
 
