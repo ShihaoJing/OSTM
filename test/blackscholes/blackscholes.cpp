@@ -255,10 +255,14 @@ void bs_thread(void *arg) {
 
 	long long endTime = getElapsedTime();
 
-	INFO("Thread " << tid << " time " << (endTime - startTime) / 9);
+	INFO("Thread " << tid << " time " << (endTime - startTime) / 1000000000.0);
 
 #ifdef ENABLE_THREADS
+
+	startTime = getElapsedTime();
 	O_API::wait_till_finish();
+	endTime = getElapsedTime();
+	INFO("Thread " << tid << " wait time " << (endTime - startTime) / 1000000000.0);
 #endif
 }
 
