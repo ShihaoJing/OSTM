@@ -212,7 +212,7 @@ fptype BlkSchlsEqEuroNoDiv( fptype sptprice,
 }
 
 static void transactional_work(void **args) {
-	int index = (long)args[0];
+	int index = *(int*)args[0];
 	fptype price = *(fptype*)args[1];
 	OTM_BEGIN();
 	tx->write_f((fptype*)&prices[index], price);
@@ -243,7 +243,7 @@ void bs_thread(void *arg) {
 
 #ifdef ENABLE_THREADS
 		void **args = (void**)malloc(sizeof(void*) * 2);
-		args[0] = (void*)i;
+		args[0] = (void*)&i;
 		args[1] = (void*)(&price);
 
 
