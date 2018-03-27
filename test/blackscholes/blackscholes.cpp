@@ -44,7 +44,7 @@ int _M4_numThreads = MAX_THREADS;
 //Precision to use for calculations
 #define fptype float
 
-#define NUM_RUNS 1
+#define NUM_RUNS 10
 
 typedef struct OptionData_ {
         fptype s;          // spot price
@@ -72,6 +72,8 @@ int numError = 0;
 static int nThreads;
 
 fptype *prices;
+
+int groupCount = 1024;
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -212,10 +214,16 @@ fptype BlkSchlsEqEuroNoDiv( fptype sptprice,
 }
 
 static void transactional_work(void **args) {
-	int index = *(int*)args[0];
-	fptype price = *(fptype*)args[1];
+	int workers_count = O_API::get_workers_count();
+	int i = *(int*)args[0];
+	fptype* price = (fptype*)args[1];
 	OTM_BEGIN();
-	tx->write_f((fptype*)&prices[index], price);
+
+	for (int j = 0; j < groupCount * workers_count; ++j) {
+		tx->write_f((fptype*)&prices[i], price[j]);
+		i += workers_count;
+	}
+	//tx->write_f((fptype*)&prices[index], price);
 	//OTM_SHARED_WRITE_F((fptype*)&prices[index], price);
 	OTM_END();
 }
@@ -229,9 +237,39 @@ void bs_thread(void *arg) {
 
 	long long startTime = getElapsedTime();
 
+#ifdef ENABLE_THREADS
 
-	for (int i = tid; i < numOptions; i += workers_count) {
-	//for (int i = start; i < end; ++i) {
+	int numTransactions = numOptions / (groupCount * workers_count);
+
+	int i = tid;
+
+	for (int age = tid; age < numTransactions; age += workers_count) {
+		fptype priceGroup[groupCount * workers_count];
+		int index = i;
+		for (int j = 0; j < groupCount * workers_count; ++j) {
+			priceGroup[j] = BlkSchlsEqEuroNoDiv(
+					sptprice[i],
+					strike[i],
+					rate[i],
+					volatility[i],
+					otime[i],
+					otype[i],
+					0);;
+
+			i += workers_count;
+		}
+
+		void **args = (void**)malloc(sizeof(void*) * 2);
+		args[0] = (void*)&index;
+		args[1] = (void*)priceGroup;
+		O_API::run_in_order(transactional_work, args, age);
+	}
+
+	long long endTime = getElapsedTime();
+
+	INFO("Thread " << tid << " time " << (endTime - startTime) / 1000000000.0);
+#else
+	for (int i = 0; i < numOptions; ++i) {
 		fptype price = BlkSchlsEqEuroNoDiv(
 				sptprice[i],
 				strike[i],
@@ -240,22 +278,11 @@ void bs_thread(void *arg) {
 				otime[i],
 				otype[i],
 				0);
-
-#ifdef ENABLE_THREADS
-		void **args = (void**)malloc(sizeof(void*) * 2);
-		args[0] = (void*)&i;
-		args[1] = (void*)(&price);
-
-
-		O_API::run_in_order(transactional_work, args, i);
-#else
 		prices[i] = price;
-#endif
 	}
 
-	long long endTime = getElapsedTime();
 
-	INFO("Thread " << tid << " time " << (endTime - startTime) / 1000000000.0);
+#endif
 
 #ifdef ENABLE_THREADS
 
@@ -373,7 +400,9 @@ int MAIN_BLACKSCHOLES(int argc, char **argv)
 
 #ifdef ENABLE_THREADS
 
-	thread_start(bs_thread, prices);
+	for (int i = 0; i < NUM_RUNS; ++i) {
+		thread_start(bs_thread, prices);
+	}
 
 
 	long long endTime = getElapsedTime();
