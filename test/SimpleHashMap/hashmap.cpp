@@ -10,8 +10,8 @@
 #include <thread>
 #include <iostream>
 #include <chrono>
+#include <random>
 
-#include "simpleMap.h"
 #include "../../conf.h"
 #include "../thread.h"
 #include "../tm.h"
@@ -31,6 +31,8 @@
 #include "../../algs/stmlite.hpp"
 #include "../../algs/stmlite-unordered.hpp"
 
+#include "cuckoo_map_long.h"
+
 /// help() - Print a help message
 void help(char *progname) {
 	using std::cout;
@@ -46,33 +48,39 @@ void help(char *progname) {
 	cout << "        [l]ist, [r]wlist, [h]ash, [s]entinel hash" << endl;
 }
 
-static unsigned keyrange = 1024;
-static unsigned iters = 1000;
-static unsigned op_ratio = 60;
-static unsigned hashpower = 16;
-static int nthreads = 1;
-static int* count;
+static int keyrange = 1024;
+static int ops = 1000;
+static int op_ratio = 60;
+cuckoo_map<long> *map;
+
+static void transactional_work(void **args) {
+	int key = *(int*)args[0];
+	int action = *(int*)args[1];
+	if (action <= op_ratio) {
+		map->add(key);
+	}
+	else {
+		map->remove(key);
+	}
+}
 
 static void worker(void *arg) {
 	int tid = thread_getId();
-	seq_map<int> *map = (seq_map<int>*) arg;
 
 	std::random_device r;
 	std::default_random_engine e(r());
 	std::uniform_int_distribution<int> key_rand(0, keyrange);
 	std::uniform_int_distribution<int> ratio_rand(1, 100);
 
-	for (int i = 0; i < iters; ++i) {
+	int workers = O_API::get_workers_count();
+
+	void* args[2];
+	for (int i = tid; i < ops; i += workers) {
 		int key = key_rand(e);
 		int action = ratio_rand(e);
-		if (action <= op_ratio) {
-			if (map->add(key))
-				count[tid]++;
-		}
-		else {
-			if(map->remove(key))
-				count[tid]--;
-		}
+		args[0] = (void*)&key;
+		args[1] = (void*)&action;
+		O_API::run_in_order(transactional_work, args, i);
 	}
 }
 
@@ -84,11 +92,8 @@ int MAIN_HASHMAP(int argc, char** argv) {
 	// for getopt
 	long opt;
 	// parameters
-	unsigned keyrange = 256;
-	unsigned ops = 1000;
-	unsigned hashpower = 16;
-	unsigned ratio = 60;
-	unsigned threads = 8;
+	int hashpower = 10;
+	int threads = 1;
 	char test = 's';
 
 	// parse the command-line options.  see help() for more info
@@ -107,7 +112,7 @@ int MAIN_HASHMAP(int argc, char** argv) {
 			hashpower = atoi(optarg);
 			break;
 		case 'R':
-			ratio = atoi(optarg);
+			op_ratio = atoi(optarg);
 			break;
 		case 't':
 			threads = atoi(optarg);
@@ -123,17 +128,14 @@ int MAIN_HASHMAP(int argc, char** argv) {
 	cout << "  key range:            " << keyrange << endl;
 	cout << "  ops/thread:           " << ops << endl;
 	cout << "  hashpower:            " << hashpower << endl;
-	cout << "  insert/remove:        " << ratio << "/" << (100 - ratio) << endl;
+	cout << "  insert/remove:        " << op_ratio << "/" << (100 - op_ratio) << endl;
 	cout << "  threads:              " << threads << endl;
 	cout << "  test name:            " << test << endl;
 	cout << endl;
 
-	seq_map<int> *map = new seq_map<int>(hashpower);
-	map->populate();
+	map = new cuckoo_map<long>(hashpower);
+	//map->populate();
 
-	count = new int[threads];
-	for (int i = 0; i < threads; ++i)
-		count[i] = 0;
 
 	// run the microbenchmark
 	O_API::init(threads);
@@ -141,7 +143,7 @@ int MAIN_HASHMAP(int argc, char** argv) {
 
 	long long startTime = getElapsedTime();
 
-	thread_start(worker, (void*) map);
+	thread_start(worker, NULL);
 
 	long long endTime = getElapsedTime();
 	thread_shutdown();
@@ -156,18 +158,7 @@ int MAIN_HASHMAP(int argc, char** argv) {
 #ifdef ENABLE_THREADS
 	O_API::print_statistics();
 #endif
-
-	int expect_size = 1024;
-	for (int i = 0; i < nthreads; ++i) {
-		expect_size += count[i];
-	}
-
-	int set_size = map->size();
-
-	cout << "expect_size: " << expect_size << endl;
-	cout << "set_size     " << set_size << endl;
-
-
+	cout << map->size() << endl;
 	cout << "!!!Bye!!!" << endl;
 	return 0;
 }

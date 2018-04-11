@@ -8,8 +8,8 @@
 //#define ERR_CHK
 #define ENABLE_STATISTICS
 
-//#define MAIN_HASHMAP main
-#define MAIN_BLACKSCHOLES		main
+#define MAIN_HASHMAP main
+//#define MAIN_BLACKSCHOLES		main
 //#define MAIN_SWAPTIONS		main
 //#define MAIN_FLUIDANIMATE 	main
 //#define MAIN_FLUIDANIMATE_SERIAL	main
@@ -66,7 +66,7 @@
 #define O_API	o_api_oul_steal_plus_plus
 #define TRANSACTION oul_steal::Transaction
 
-#define STM_BITS_32
-//#define STM_BITS_64
+//#define STM_BITS_32
+#define STM_BITS_64
 
 #define TM_INLINE   __attribute__((always_inline))

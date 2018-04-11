@@ -7,7 +7,6 @@
 
 using namespace std;
 
-static atomic_int global_age;
 
 #include "../conf.h"
 #include "./thread.h"
@@ -28,31 +27,26 @@ static atomic_int global_age;
 
 
 
-int* num;
+long *num;
 int* nums[4];
-
-static int o = 0;
-static long n = 100;
-static long m = 10000;
-static long* elements;
 
 
 static void transactional_work(void **args) {
-	int index = *((int*)args[0]);
+	long index = *((int*)args[0]);
 	OTM_BEGIN();
-	//OTM_SHARED_WRITE_I(*(nums[index]), index);
-	tx->write_i((int*)&num[index], index);
+	OTM_SHARED_WRITE_L(num[index], index);
+	//tx->write_l((long*)&num[index], index);
 	//OTM_SHARED_WRITE_I((int*)&num[index], index);
 	OTM_END();
 }
 
 static void worker(void *args) {
 	int tid = thread_getId();
+	void **arg = new void*[1];
 	int workers = O_API::get_workers_count();
 	for (int i = tid; i < 4; i += workers) {
-		void **args = new void*[1];
-		args[0] = (void*)&i;
-		O_API::run_in_order(transactional_work, args, i);
+		arg[0] = (void*)&i;
+		O_API::run_in_order(transactional_work, arg, i);
 	}
 
 	O_API::wait_till_finish();
@@ -60,12 +54,14 @@ static void worker(void *args) {
 
 
  int MAIN_MICROBENCH(int argc, char *argv[]) {
-	 global_age = 0;
 
 	 for (int i = 0; i < 4; ++i) {
 		 nums[i] = new int;
 	 }
-	 num = new int[4];
+	 num = new long[4];
+	 for (int i = 0; i < 4; ++i) {
+	 		 cout << num[i] << endl;
+	 	 }
 	 int threadNum = 4;
 	 O_API::init(threadNum);
 	 thread_startup(threadNum);
