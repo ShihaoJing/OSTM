@@ -183,23 +183,18 @@ void transational_smvp(void **args) {
 		OTM_SHARED_WRITE_P(w[col][1], old_w1 + v1);
 		OTM_SHARED_WRITE_P(w[col][2], old_w2 + v2);
 
-		/*w[col][0] += v0;
+		/*
+		w[col][0] += v0;
 		w[col][1] += v1;
 		w[col][2] += v2;*/
+
 		Anext++;
 	}
 
-	double old_w0 = OTM_SHARED_READ_P(w[i][0]);
-	double old_w1 = OTM_SHARED_READ_P(w[i][1]);
-	double old_w2 = OTM_SHARED_READ_P(w[i][2]);
 
-	OTM_SHARED_WRITE_P(w[i][0], old_w0 + sum0);
-	OTM_SHARED_WRITE_P(w[i][1], old_w1 + sum1);
-	OTM_SHARED_WRITE_P(w[i][2], old_w2 + sum2);
-
-	/*w[i][0] += sum0;
+	w[i][0] += sum0;
 	w[i][1] += sum1;
-	w[i][2] += sum2;*/
+	w[i][2] += sum2;
 
 }
 
@@ -534,6 +529,7 @@ int MAIN_QUAKE(int argc, char **argv)
 	}
 
 	/* Time integration loop */
+	timesteps = timesteps / 3;
 
 	fprintf(stderr, "\n");
 	fprintf(stderr, "%d timesteps\n", timesteps);
@@ -541,6 +537,7 @@ int MAIN_QUAKE(int argc, char **argv)
 	int nthreads = 1;
 	O_API::init(nthreads);
 	thread_startup(nthreads);
+
 
 
 	for (iter = 1; iter <= timesteps; iter++) {
