@@ -21,7 +21,7 @@
 
 #include "./../conf.h"
 
-#define LOGGING
+//#define LOGGING
 //#define DEFFERED
 
 //#define INFO(X)

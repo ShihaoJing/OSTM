@@ -9,8 +9,10 @@ RM := rm -rf
 # All of the sources participating in the build are defined here
 -include sources.mk
 -include test/swaptions/subdir.mk
+-include test/quake/subdir.mk
 -include test/fluidanimate/subdir.mk
 -include test/blackscholes/subdir.mk
+-include test/astar/subdir.mk
 -include test/SimpleHashMap/subdir.mk
 -include test/subdir.mk
 -include o-api/subdir.mk
@@ -50,7 +52,7 @@ all: OSTM
 OSTM: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross G++ Linker'
-	g++  -o "OSTM" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -pg -o "OSTM" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

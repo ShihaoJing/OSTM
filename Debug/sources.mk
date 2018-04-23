@@ -26,8 +26,10 @@ SUBDIRS := \
 algs \
 o-api \
 test/SimpleHashMap \
+test/astar \
 test/blackscholes \
 test/fluidanimate \
+test/quake \
 test/swaptions \
 test \
 

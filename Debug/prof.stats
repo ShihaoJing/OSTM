@@ -1,0 +1,55 @@
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  Ts/call  Ts/call  name    
+ 64.40     32.87    32.87                             smvp(int, double***, int*, int*, double**, double**)
+ 27.76     47.04    14.17                             main
+  2.33     48.23     1.19                             phi2(double)
+  2.11     49.31     1.08                             phi1(double)
+  1.85     50.25     0.95                             phi0(double)
+  0.43     50.47     0.22                             undolog_vis::Lock::Lock()
+  0.35     50.65     0.18                             element_matrices(double (*) [3], properties*, double (*) [12], double*)
+  0.24     50.77     0.12                             oul_speculative::Lock::Lock()
+  0.22     50.88     0.11                             oul_steal::Lock::Lock()
+  0.14     50.95     0.07                             abe_matrix(double (*) [3], int*, properties*, double*)
+  0.06     50.98     0.03                             inv_J(double (*) [3], double*)
+  0.02     50.99     0.01                             _GLOBAL__sub_I__ZN5owbrh9htm_countE
+  0.02     51.00     0.01                             __static_initialization_and_destruction_0(int, int)
+  0.02     51.01     0.01                             get_Enu(properties*, double*, double*)
+  0.02     51.02     0.01                             mem_init()
+  0.02     51.03     0.01                             owb::Lock::Lock()
+  0.02     51.04     0.01                             commons::List<oul_kill::Transaction*>::List()
+
+ %         the percentage of the total running time of the
+time       program used by this function.
+
+cumulative a running sum of the number of seconds accounted
+ seconds   for by this function and those listed above it.
+
+ self      the number of seconds accounted for by this
+seconds    function alone.  This is the major sort for this
+           listing.
+
+calls      the number of times this function was invoked, if
+           this function is profiled, else blank.
+
+ self      the average number of milliseconds spent in this
+ms/call    function per call, if this function is profiled,
+	   else blank.
+
+ total     the average number of milliseconds spent in this
+ms/call    function and its descendents per call, if this
+	   function is profiled, else blank.
+
+name       the name of the function.  This is the minor sort
+           for this listing. The index shows the location of
+	   the function in the gprof listing. If the index is
+	   in parenthesis it shows where it would appear in
+	   the gprof listing if it were to be printed.
+
+Copyright (C) 2012-2015 Free Software Foundation, Inc.
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.

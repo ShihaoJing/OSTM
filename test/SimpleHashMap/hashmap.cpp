@@ -53,34 +53,34 @@ static int ops = 1000;
 static int op_ratio = 60;
 cuckoo_map<long> *map;
 
+static int groupCount = 1024;
+
 static void transactional_work(void **args) {
-	int key = *(int*)args[0];
-	int action = *(int*)args[1];
-	if (action <= op_ratio) {
-		map->add(key);
-	}
-	else {
-		map->remove(key);
+	int workers_count = O_API::get_workers_count();
+	std::random_device r;
+	std::default_random_engine e(r());
+	std::uniform_int_distribution<int> key_rand(0, keyrange);
+	std::uniform_int_distribution<int> ratio_rand(1, 100);
+	for (int i = 0; i < groupCount * workers_count; ++i) {
+		int key = key_rand(e);
+		int action = ratio_rand(e);if (action <= op_ratio) {
+			map->add(key);
+		}
+		else {
+			map->remove(key);
+		}
 	}
 }
 
 static void worker(void *arg) {
 	int tid = thread_getId();
+	int workers_count = O_API::get_workers_count();
 
-	std::random_device r;
-	std::default_random_engine e(r());
-	std::uniform_int_distribution<int> key_rand(0, keyrange);
-	std::uniform_int_distribution<int> ratio_rand(1, 100);
+	int numTransactions = ops / (groupCount * workers_count);
 
-	int workers = O_API::get_workers_count();
+	for (int age = tid; age < numTransactions; age += workers_count) {
 
-	void* args[2];
-	for (int i = tid; i < ops; i += workers) {
-		int key = key_rand(e);
-		int action = ratio_rand(e);
-		args[0] = (void*)&key;
-		args[1] = (void*)&action;
-		O_API::run_in_order(transactional_work, args, i);
+		O_API::run_in_order(transactional_work, NULL, age);
 	}
 }
 
