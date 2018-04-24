@@ -70,7 +70,7 @@
 #define O_API	o_api_oul_steal_plus_plus
 #define TRANSACTION oul_steal::Transaction
 
-//#define STM_BITS_32
-#define STM_BITS_64
+#define STM_BITS_32
+//#define STM_BITS_64
 
 #define TM_INLINE   __attribute__((always_inline))

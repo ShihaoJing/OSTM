@@ -132,7 +132,7 @@ int *nodekind;
 double *nodekindf;
 int *source_elms;
 double **M, **C, **M23, **C23, **V23, **vel;
-float ***disp;
+double ***disp;
 double ***K;
 
 int disptplus, dispt, disptminus;
@@ -144,20 +144,28 @@ struct damping Damp;
 int timesteps;
 
 /*--------------------------------------------------------------------------*/ 
-void transational_smvp(void **args) {
+void transational_smvp(void **func_args) {
 	OTM_BEGIN();
+
 	double ***A = K;
 	int *Acol = ARCHmatrixcol;
 	int *Aindex = ARCHmatrixindex;
-	float **v = disp[dispt];
-	float **w = disp[disptplus];
+	double **v = disp[dispt];
+	double **w = disp[disptplus];
 
-	int i = *(int*)args[0];
+	int i = *(int*)func_args[0];
+
+	if (i >= ARCHnodes)
+		return;
+
 	int Anext, Alast, col;
 	double sum0, sum1, sum2;
 
 	Anext = Aindex[i];
 	Alast = Aindex[i + 1];
+
+	int t0 = A[Anext][0][0];
+	int t1 = v[i][0];
 
 	sum0 = A[Anext][0][0]*v[i][0] + A[Anext][0][1]*v[i][1] + A[Anext][0][2]*v[i][2];
 	sum1 = A[Anext][1][0]*v[i][0] + A[Anext][1][1]*v[i][1] + A[Anext][1][2]*v[i][2];
@@ -175,13 +183,15 @@ void transational_smvp(void **args) {
 		int v1 = A[Anext][0][1]*v[i][0] + A[Anext][1][1]*v[i][1] + A[Anext][2][1]*v[i][2];
 		int v2 = A[Anext][0][2]*v[i][0] + A[Anext][1][2]*v[i][1] + A[Anext][2][2]*v[i][2];
 
-		double old_w0 = OTM_SHARED_READ_F(w[col][0]);
-		double old_w1 = OTM_SHARED_READ_F(w[col][1]);
-		double old_w2 = OTM_SHARED_READ_F(w[col][2]);
 
-		OTM_SHARED_WRITE_F(w[col][0], old_w0 + v0);
-		OTM_SHARED_WRITE_F(w[col][1], old_w1 + v1);
-		OTM_SHARED_WRITE_F(w[col][2], old_w2 + v2);
+
+		double old_w0 = OTM_SHARED_READ_P(w[col][0]);
+		double old_w1 = OTM_SHARED_READ_P(w[col][1]);
+		double old_w2 = OTM_SHARED_READ_P(w[col][2]);
+
+		OTM_SHARED_WRITE_P(w[col][0], old_w0 + v0);
+		OTM_SHARED_WRITE_P(w[col][1], old_w1 + v1);
+		OTM_SHARED_WRITE_P(w[col][2], old_w2 + v2);
 
 		/*
 		w[col][0] += v0;
@@ -191,21 +201,31 @@ void transational_smvp(void **args) {
 		Anext++;
 	}
 
+	double old_w0 = OTM_SHARED_READ_P(w[i][0]);
+	double old_w1 = OTM_SHARED_READ_P(w[i][1]);
+	double old_w2 = OTM_SHARED_READ_P(w[i][2]);
 
-	w[i][0] += sum0;
+	OTM_SHARED_WRITE_P(w[i][0], old_w0 + sum0);
+	OTM_SHARED_WRITE_P(w[i][1], old_w1 + sum1);
+	OTM_SHARED_WRITE_P(w[i][2], old_w2 + sum2);
+
+
+	/*w[i][0] += sum0;
 	w[i][1] += sum1;
-	w[i][2] += sum2;
+	w[i][2] += sum2;*/
 
 }
 
 
-static void smp_worker(void *args) {
+static void smp_worker(void *worker_args) {
 	int tid = thread_getId();
 	int workers = O_API::get_workers_count();
-	void* arg[1];
-	for (int i = tid; i < ARCHnodes; i += workers) {
-		arg[0] = (void*)&i;
-		O_API::run_in_order(transational_smvp, arg, i);
+	void* args[1];
+	int age = tid;
+	while (age < ARCHnodes) {
+		args[0] = (void*)&age;
+		O_API::run_in_order(transational_smvp, args, age);
+		age += workers;
 	}
 
 	O_API::wait_till_finish();
@@ -534,7 +554,7 @@ int MAIN_QUAKE(int argc, char **argv)
 	fprintf(stderr, "\n");
 	fprintf(stderr, "%d timesteps\n", timesteps);
 
-	int nthreads = atoi(argv[1]);
+	int nthreads = atoi(argv[2]);
 	O_API::init(nthreads);
 	thread_startup(nthreads);
 
@@ -1227,7 +1247,7 @@ void arch_init(int argc, char **argv, struct options *op)
 	arch_parsecommandline(argc, argv, op);
 
 	/* read the pack file */
-	packfile = stdin;
+	packfile = fopen(argv[1],"r");
 	readpackfile(packfile, op);
 
 }
@@ -1479,22 +1499,22 @@ void mem_init(void) {
 
 	/* Displacement array disp[3][ARCHnodes][3] */
 
-	disp = (float ***) malloc(3 * sizeof(float **));
-	if (disp == (float ***) NULL) {
+	disp = (double ***) malloc(3 * sizeof(double **));
+	if (disp == (double ***) NULL) {
 		fprintf(stderr, "malloc failed for disp\n");
 		fflush(stderr);
 		exit(0);
 	}
 	for (i = 0; i < 3; i++) {
-		disp[i] = (float **) malloc(ARCHnodes * sizeof(float *));
-		if (disp[i] == (float **) NULL) {
+		disp[i] = (double **) malloc(ARCHnodes * sizeof(double *));
+		if (disp[i] == (double **) NULL) {
 			fprintf(stderr, "malloc failed for disp[%d]\n",i);
 			fflush(stderr);
 			exit(0);
 		}
 		for (j = 0; j < ARCHnodes; j++) {
-			disp[i][j] = (float *) malloc(3 * sizeof(float));
-			if (disp[i][j] == (float *) NULL) {
+			disp[i][j] = (double *) malloc(3 * sizeof(double));
+			if (disp[i][j] == (double *) NULL) {
 				fprintf(stderr, "malloc failed for disp[%d][%d]\n",i,j);
 				fflush(stderr);
 				exit(0);
