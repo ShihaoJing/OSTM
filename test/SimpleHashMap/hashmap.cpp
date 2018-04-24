@@ -11,6 +11,7 @@
 #include <iostream>
 #include <chrono>
 #include <random>
+#include <vector>
 
 #include "../../conf.h"
 #include "../thread.h"
@@ -48,27 +49,20 @@ void help(char *progname) {
 	cout << "        [l]ist, [r]wlist, [h]ash, [s]entinel hash" << endl;
 }
 
-static int keyrange = 1024;
-static int ops = 1000;
+static int keyrange = 102400;
+static int ops = 512;
 static int op_ratio = 60;
 cuckoo_map<long> *map;
 
 static int groupCount = 1024;
 
 static void transactional_work(void **args) {
-	int workers_count = O_API::get_workers_count();
-	std::random_device r;
-	std::default_random_engine e(r());
-	std::uniform_int_distribution<int> key_rand(0, keyrange);
-	std::uniform_int_distribution<int> ratio_rand(1, 100);
-	for (int i = 0; i < groupCount * workers_count; ++i) {
-		int key = key_rand(e);
-		int action = ratio_rand(e);if (action <= op_ratio) {
-			map->add(key);
-		}
-		else {
-			map->remove(key);
-		}
+	bool add_op = *(bool*)args[0];
+	int key = *(int*)args[1];
+	if (add_op) {
+		map->add(key);
+	} else {
+		map->remove(key);
 	}
 }
 
@@ -76,12 +70,36 @@ static void worker(void *arg) {
 	int tid = thread_getId();
 	int workers_count = O_API::get_workers_count();
 
-	int numTransactions = ops / (groupCount * workers_count);
+	vector<int> keys;
 
-	for (int age = tid; age < numTransactions; age += workers_count) {
+	std::random_device r;
+	std::default_random_engine e(r());
+	std::uniform_int_distribution<int> key_rand(0, keyrange);
 
-		O_API::run_in_order(transactional_work, NULL, age);
+	void* args[2];
+	bool add_op = true;
+
+	for (int age = tid; age < ops; age += workers_count) {
+		int key = key_rand(e);
+		keys.push_back(key);
+		args[0] = (void*)&add_op;
+		args[1] = (void*)&key;
+		O_API::run_in_order(transactional_work, args, age);
 	}
+
+	O_API::wait_till_finish();
+
+	add_op = false;
+
+	for (int age = tid; age < ops; age += workers_count) {
+		int key = keys.back();
+		keys.pop_back();
+		args[0] = (void*)&add_op;
+		args[1] = (void*)&key;
+		O_API::run_in_order(transactional_work, args, age);
+	}
+
+	O_API::wait_till_finish();
 }
 
 int MAIN_HASHMAP(int argc, char** argv) {
@@ -134,7 +152,7 @@ int MAIN_HASHMAP(int argc, char** argv) {
 	cout << endl;
 
 	map = new cuckoo_map<long>(hashpower);
-	//map->populate();
+	map->populate();
 
 
 	// run the microbenchmark

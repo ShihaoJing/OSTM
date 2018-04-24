@@ -9,6 +9,7 @@ RM := rm -rf
 # All of the sources participating in the build are defined here
 -include sources.mk
 -include test/swaptions/subdir.mk
+-include test/scanner/subdir.mk
 -include test/quake/subdir.mk
 -include test/fluidanimate/subdir.mk
 -include test/blackscholes/subdir.mk

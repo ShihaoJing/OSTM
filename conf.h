@@ -10,8 +10,9 @@
 
 //#define MAIN_ASTAR main
 #define MAIN_QUAKE main
-
+//#define MAIN_SCANNER main
 //#define MAIN_HASHMAP main
+
 //#define MAIN_BLACKSCHOLES		main
 //#define MAIN_SWAPTIONS		main
 //#define MAIN_FLUIDANIMATE 	main

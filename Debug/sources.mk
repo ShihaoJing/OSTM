@@ -30,6 +30,7 @@ test/astar \
 test/blackscholes \
 test/fluidanimate \
 test/quake \
+test/scanner \
 test/swaptions \
 test \
 
