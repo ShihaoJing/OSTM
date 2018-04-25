@@ -132,7 +132,7 @@ int *nodekind;
 double *nodekindf;
 int *source_elms;
 double **M, **C, **M23, **C23, **V23, **vel;
-double ***disp;
+float ***disp;
 double ***K;
 
 int disptplus, dispt, disptminus;
@@ -144,91 +144,114 @@ struct damping Damp;
 int timesteps;
 
 /*--------------------------------------------------------------------------*/ 
-void transational_smvp(void **func_args) {
+
+struct transac_param {
+	int *Acol;
+	double ***A;
+	int Anext;
+	int Alast;
+	float **v;
+	float **w;
+	int iter;
+};
+
+void transactional_smvp(void **args) {
+
+	int workers = O_API::get_workers_count();
+	int tid = thread_getId();
+
 	OTM_BEGIN();
+	transac_param *param = (transac_param*)args[0];
+	int Anext = param->Anext;
+	int Alast = param->Alast;
+	double ***A = param->A;
+	int *Acol = param->Acol;
+	float **v = param->v;
+	float **w = param->w;
+	int i = param->iter;
 
-	double ***A = K;
-	int *Acol = ARCHmatrixcol;
-	int *Aindex = ARCHmatrixindex;
-	double **v = disp[dispt];
-	double **w = disp[disptplus];
 
-	int i = *(int*)func_args[0];
+	Anext += tid;
 
-	if (i >= ARCHnodes)
-		return;
-
-	int Anext, Alast, col;
-	double sum0, sum1, sum2;
-
-	Anext = Aindex[i];
-	Alast = Aindex[i + 1];
-
-	int t0 = A[Anext][0][0];
-	int t1 = v[i][0];
-
-	sum0 = A[Anext][0][0]*v[i][0] + A[Anext][0][1]*v[i][1] + A[Anext][0][2]*v[i][2];
-	sum1 = A[Anext][1][0]*v[i][0] + A[Anext][1][1]*v[i][1] + A[Anext][1][2]*v[i][2];
-	sum2 = A[Anext][2][0]*v[i][0] + A[Anext][2][1]*v[i][1] + A[Anext][2][2]*v[i][2];
-
-	Anext++;
 	while (Anext < Alast) {
-		col = Acol[Anext];
-
-		sum0 += A[Anext][0][0]*v[col][0] + A[Anext][0][1]*v[col][1] + A[Anext][0][2]*v[col][2];
-		sum1 += A[Anext][1][0]*v[col][0] + A[Anext][1][1]*v[col][1] + A[Anext][1][2]*v[col][2];
-		sum2 += A[Anext][2][0]*v[col][0] + A[Anext][2][1]*v[col][1] + A[Anext][2][2]*v[col][2];
-
+		int col = Acol[Anext];
 		int v0 = A[Anext][0][0]*v[i][0] + A[Anext][1][0]*v[i][1] + A[Anext][2][0]*v[i][2];
 		int v1 = A[Anext][0][1]*v[i][0] + A[Anext][1][1]*v[i][1] + A[Anext][2][1]*v[i][2];
 		int v2 = A[Anext][0][2]*v[i][0] + A[Anext][1][2]*v[i][1] + A[Anext][2][2]*v[i][2];
 
 
+		/*float old_w0 = OTM_SHARED_READ_F(w[col][0]);
+		float old_w1 = OTM_SHARED_READ_F(w[col][1]);
+		float old_w2 = OTM_SHARED_READ_F(w[col][2]);*/
 
-		double old_w0 = OTM_SHARED_READ_P(w[col][0]);
-		double old_w1 = OTM_SHARED_READ_P(w[col][1]);
-		double old_w2 = OTM_SHARED_READ_P(w[col][2]);
 
-		OTM_SHARED_WRITE_P(w[col][0], old_w0 + v0);
-		OTM_SHARED_WRITE_P(w[col][1], old_w1 + v1);
-		OTM_SHARED_WRITE_P(w[col][2], old_w2 + v2);
+		OTM_SHARED_WRITE_F(w[col][0], w[col][0] + v0);
+		OTM_SHARED_WRITE_F(w[col][1], w[col][1] + v1);
+		OTM_SHARED_WRITE_F(w[col][2], w[col][2] + v2);
 
-		/*
-		w[col][0] += v0;
-		w[col][1] += v1;
-		w[col][2] += v2;*/
 
-		Anext++;
+
+		Anext += workers;
 	}
-
-	double old_w0 = OTM_SHARED_READ_P(w[i][0]);
-	double old_w1 = OTM_SHARED_READ_P(w[i][1]);
-	double old_w2 = OTM_SHARED_READ_P(w[i][2]);
-
-	OTM_SHARED_WRITE_P(w[i][0], old_w0 + sum0);
-	OTM_SHARED_WRITE_P(w[i][1], old_w1 + sum1);
-	OTM_SHARED_WRITE_P(w[i][2], old_w2 + sum2);
-
-
-	/*w[i][0] += sum0;
-	w[i][1] += sum1;
-	w[i][2] += sum2;*/
 
 }
 
+void smp_worker(void *worker_arg) {
 
-static void smp_worker(void *worker_args) {
-	int tid = thread_getId();
+	transac_param *param = (transac_param*)worker_arg;
 	int workers = O_API::get_workers_count();
+	int tid = thread_getId();
 	void* args[1];
-	int age = tid;
-	while (age < ARCHnodes) {
-		args[0] = (void*)&age;
-		O_API::run_in_order(transational_smvp, args, age);
-		age += workers;
-	}
+	args[0] = worker_arg;
+	O_API::run_in_order(transactional_smvp, args, tid);
 
 	O_API::wait_till_finish();
+}
+
+void smp2(int iter) {
+
+	for (int i = 0; i < ARCHnodes; ++i) {
+		double ***A = K;
+		int *Acol = ARCHmatrixcol;
+		int *Aindex = ARCHmatrixindex;
+		float **v = disp[dispt];
+		float **w = disp[disptplus];
+
+		int Anext, Alast;
+
+		Anext = Aindex[i];
+		Alast = Aindex[i + 1];
+
+
+		Anext++;
+
+		transac_param param = {};
+		param.Acol = Acol;
+		param.A = A;
+		param.Anext = Anext;
+		param.Alast = Alast;
+		param.v = v;
+		param.w = w;
+		param.iter = i;
+
+		thread_start(smp_worker, (void*)&param);
+
+		/*int values[3];
+
+		while (Anext < Alast) {
+			int col = Acol[Anext];
+			values[0] = A[Anext][0][0]*v[i][0] + A[Anext][1][0]*v[i][1] + A[Anext][2][0]*v[i][2];
+			values[1] = A[Anext][0][1]*v[i][0] + A[Anext][1][1]*v[i][1] + A[Anext][2][1]*v[i][2];
+			values[2] = A[Anext][0][2]*v[i][0] + A[Anext][1][2]*v[i][1] + A[Anext][2][2]*v[i][2];
+
+			w[col][0] += values[0];
+			w[col][1] += values[1];
+			w[col][2] += values[2];
+
+			Anext++;
+		}*/
+
+	}
 }
 
 int MAIN_QUAKE(int argc, char **argv)
@@ -549,7 +572,6 @@ int MAIN_QUAKE(int argc, char **argv)
 	}
 
 	/* Time integration loop */
-	timesteps = timesteps / 3;
 
 	fprintf(stderr, "\n");
 	fprintf(stderr, "%d timesteps\n", timesteps);
@@ -559,16 +581,23 @@ int MAIN_QUAKE(int argc, char **argv)
 	thread_startup(nthreads);
 
 
+	//timesteps = timesteps / 3;
+	timesteps = 1;
+
 
 	for (iter = 1; iter <= timesteps; iter++) {
+
+		cout << iter << endl;
 
 		for (i = 0; i < ARCHnodes; i++)
 			for (j = 0; j < 3; j++)
 				disp[disptplus][i][j] = 0.0;
 
-		thread_start(smp_worker, NULL);
+		//thread_start(smp_worker, NULL);
 
 		//smvp(ARCHnodes, K, ARCHmatrixcol, ARCHmatrixindex, disp[dispt], disp[disptplus]);
+
+		smp2(iter);
 
 		time = iter * Exc.dt;
 
@@ -609,6 +638,8 @@ int MAIN_QUAKE(int argc, char **argv)
 	if (!options.quiet) {
 		fprintf(stderr, "%s: Done. Terminating the simulation.\n", progname);
 	}
+
+	O_API::print_statistics();
 
 	return 0;
 }
@@ -1499,22 +1530,22 @@ void mem_init(void) {
 
 	/* Displacement array disp[3][ARCHnodes][3] */
 
-	disp = (double ***) malloc(3 * sizeof(double **));
-	if (disp == (double ***) NULL) {
+	disp = (float ***) malloc(3 * sizeof(float **));
+	if (disp == (float ***) NULL) {
 		fprintf(stderr, "malloc failed for disp\n");
 		fflush(stderr);
 		exit(0);
 	}
 	for (i = 0; i < 3; i++) {
-		disp[i] = (double **) malloc(ARCHnodes * sizeof(double *));
-		if (disp[i] == (double **) NULL) {
+		disp[i] = (float **) malloc(ARCHnodes * sizeof(float *));
+		if (disp[i] == (float **) NULL) {
 			fprintf(stderr, "malloc failed for disp[%d]\n",i);
 			fflush(stderr);
 			exit(0);
 		}
 		for (j = 0; j < ARCHnodes; j++) {
-			disp[i][j] = (double *) malloc(3 * sizeof(double));
-			if (disp[i][j] == (double *) NULL) {
+			disp[i][j] = (float *) malloc(3 * sizeof(float));
+			if (disp[i][j] == (float *) NULL) {
 				fprintf(stderr, "malloc failed for disp[%d][%d]\n",i,j);
 				fflush(stderr);
 				exit(0);
